@@ -35,6 +35,15 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
   const [activeTab, setActiveTab] = useState<'basic' | 'stores' | 'marketing' | 'policy'>('basic');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Per-field validation errors
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const setFieldError = (field: string, msg: string) =>
+    setFieldErrors((prev) => ({ ...prev, [field]: msg }));
+  const clearFieldError = (field: string) =>
+    setFieldErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
 
   // Form State (Exact mapping to tbl_app in Excel sheet)
   const [appName, setAppName] = useState('');
@@ -137,6 +146,7 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
     resetForm();
     setEditingAppId(null);
     setActiveTab('basic');
+    setSaveError(null);
     setShowModal(true);
   };
 
@@ -198,11 +208,110 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
 
   const handleSaveApp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!appName || (!androidPackage && !iosBundleId)) {
-      alert('Please fill App Name and Android Package Name (or iOS Bundle ID)');
+
+    // --- Full field-level validation ---
+    const errors: Record<string, string> = {};
+
+    // App Name
+    if (!appName.trim()) {
+      errors.appName = 'Application name is required.';
+    } else if (appName.trim().length < 2) {
+      errors.appName = 'Application name must be at least 2 characters.';
+    }
+
+    // Package / Bundle – platform-aware
+    const needsAndroid = platform === 'ANDROID' || platform === 'BOTH';
+    const needsIos = platform === 'IOS' || platform === 'BOTH';
+    const androidPkgPattern = /^[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*){1,}$/;
+    const iosBundlePattern = /^[a-zA-Z][a-zA-Z0-9\-]*(?:\.[a-zA-Z0-9\-]+){1,}$/;
+
+    if (needsAndroid && !androidPackage.trim()) {
+      errors.androidPackage = `Android Package Name is required for platform "${platform}".`;
+    } else if (androidPackage.trim() && !androidPkgPattern.test(androidPackage.trim())) {
+      errors.androidPackage = 'Invalid format. Expected: com.example.app (at least two dot-separated segments).';
+    }
+
+    if (needsIos && !iosBundleId.trim()) {
+      errors.iosBundleId = `iOS Bundle ID is required for platform "${platform}".`;
+    } else if (iosBundleId.trim() && !iosBundlePattern.test(iosBundleId.trim())) {
+      errors.iosBundleId = 'Invalid format. Expected: com.example.app (at least two dot-separated segments).';
+    }
+
+    if (!needsAndroid && !needsIos && !androidPackage.trim() && !iosBundleId.trim()) {
+      errors.androidPackage = 'Provide at least one platform identifier: Android Package Name or iOS Bundle ID.';
+    }
+
+    // Version
+    const semverPattern = /^\d+\.\d+(\.\d+)?$/;
+    if (appVersion.trim() && !semverPattern.test(appVersion.trim())) {
+      errors.appVersion = 'Version must follow format: 1.0 or 1.0.0';
+    }
+
+    // Build numbers – must be positive integers
+    if (androidBuild.trim() && (isNaN(Number(androidBuild)) || Number(androidBuild) < 1)) {
+      errors.androidBuild = 'Android build number must be a positive integer.';
+    }
+    if (iosBuild.trim() && (isNaN(Number(iosBuild)) || Number(iosBuild) < 1)) {
+      errors.iosBuild = 'iOS build number must be a positive integer.';
+    }
+
+    // Store URLs
+    const urlPattern = /^https?:\/\/.+/i;
+    if (googleplayLink.trim() && !urlPattern.test(googleplayLink.trim())) {
+      errors.googleplayLink = 'Must be a valid URL starting with http:// or https://';
+    }
+    if (appstoreLink.trim() && !urlPattern.test(appstoreLink.trim())) {
+      errors.appstoreLink = 'Must be a valid URL starting with http:// or https://';
+    }
+
+    // Firebase
+    if (firebaseConfigMode === 'KEY' && firebasePushKey.trim() && firebasePushKey.trim().length < 20) {
+      errors.firebasePushKey = 'Legacy Server Key appears too short. Please verify the key from Firebase Console.';
+    }
+    if (firebaseConfigMode === 'JSON' && firebaseServiceAccountJson.trim() && jsonError) {
+      errors.firebaseJson = jsonError;
+    }
+
+    // Policy URLs
+    if (androidAdsPolicyUrl.trim() && !urlPattern.test(androidAdsPolicyUrl.trim())) {
+      errors.androidAdsPolicyUrl = 'Must be a valid URL starting with http:// or https://';
+    }
+    if (iosAdsPolicyUrl.trim() && !urlPattern.test(iosAdsPolicyUrl.trim())) {
+      errors.iosAdsPolicyUrl = 'Must be a valid URL starting with http:// or https://';
+    }
+    if (androidVideoUrl.trim() && !urlPattern.test(androidVideoUrl.trim())) {
+      errors.androidVideoUrl = 'Must be a valid URL starting with http:// or https://';
+    }
+
+    // Notification frequency
+    if (ownNotificationFreq.trim() && (isNaN(Number(ownNotificationFreq)) || Number(ownNotificationFreq) < 1)) {
+      errors.ownNotificationFreq = 'Must be a positive number (days).';
+    }
+    if (crossNotificationFreq.trim() && (isNaN(Number(crossNotificationFreq)) || Number(crossNotificationFreq) < 1)) {
+      errors.crossNotificationFreq = 'Must be a positive number (days).';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      // Auto-navigate to the first tab that has errors
+      const tabErrorMap: Record<string, string[]> = {
+        basic: ['appName', 'androidPackage', 'iosBundleId', 'appVersion', 'androidBuild', 'iosBuild'],
+        stores: ['googleplayLink', 'appstoreLink'],
+        marketing: ['firebasePushKey', 'firebaseJson', 'ownNotificationFreq', 'crossNotificationFreq'],
+        policy: ['androidAdsPolicyUrl', 'iosAdsPolicyUrl', 'androidVideoUrl']
+      };
+      for (const [tab, fields] of Object.entries(tabErrorMap)) {
+        if (fields.some((f) => errors[f])) {
+          setActiveTab(tab as any);
+          break;
+        }
+      }
+      setSaveError('Please fix the highlighted errors before saving.');
       return;
     }
 
+    setFieldErrors({});
+    setSaveError(null);
     setLoading(true);
     try {
       const payload: any = {
@@ -259,7 +368,8 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
         }
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Error saving application');
+      const serverMessage = err.response?.data?.message;
+      setSaveError(serverMessage || 'Unable to save the application. Please review the form and try again.');
     } finally {
       setLoading(false);
     }
@@ -286,6 +396,8 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
     setFirebaseProjectId('');
     setFirebaseClientEmail('');
     setJsonError(null);
+    setSaveError(null);
+    setFieldErrors({});
     setShowRawJson(false);
     setFirebaseConfigMode('JSON');
     setIsPushMarketing(true);
@@ -300,6 +412,25 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
     setAndroidVideoUrl('');
     setIosVideoUrl('');
   };
+
+  // Helper: render an inline field error
+  const FieldError = ({ field }: { field: string }) =>
+    fieldErrors[field] ? (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '5px',
+          marginTop: '4px',
+          fontSize: '0.72rem',
+          color: '#EF4444',
+          fontWeight: 500
+        }}
+      >
+        <AlertCircle size={12} style={{ flexShrink: 0 }} />
+        <span>{fieldErrors[field]}</span>
+      </div>
+    ) : null;
 
   const handleRegenerateKeys = async (appId: string) => {
     if (!window.confirm('Regenerate API keys for this app? Old keys will immediately become invalid.')) return;
@@ -594,22 +725,48 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
                 padding: '20px 30px 26px 30px'
               }}
             >
+              {saveError && (
+                <div
+                  role="alert"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#991B1B',
+                    fontSize: '0.82rem',
+                    lineHeight: 1.45
+                  }}
+                >
+                  <AlertCircle size={17} style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <span>{saveError}</span>
+                </div>
+              )}
+
               {/* TAB 1: General Info */}
               {activeTab === 'basic' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.appName ? '#EF4444' : 'var(--text-muted)' }}>
                         Application Name (app_name) *
                       </label>
                       <input
                         type="text"
                         placeholder="e.g. Love Calculator Pro"
                         className="input-control"
+                        style={fieldErrors.appName ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={appName}
-                        onChange={(e) => setAppName(e.target.value)}
-                        required
+                        onChange={(e) => {
+                          setAppName(e.target.value);
+                          clearFieldError('appName');
+                          setSaveError(null);
+                        }}
                       />
+                      <FieldError field="appName" />
                     </div>
                     <div>
                       <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
@@ -632,29 +789,42 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                        Android Package Name (android_package_name) *
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.androidPackage ? '#EF4444' : 'var(--text-muted)' }}>
+                        Android Package Name (android_package_name)
+                        {(platform === 'ANDROID' || platform === 'BOTH') && <span style={{ color: '#EF4444' }}> *</span>}
                       </label>
                       <input
                         type="text"
                         placeholder="com.example.app"
                         className="input-control font-mono"
+                        style={fieldErrors.androidPackage ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={androidPackage}
-                        onChange={(e) => setAndroidPackage(e.target.value)}
-                        required
+                        onChange={(e) => {
+                          setAndroidPackage(e.target.value);
+                          clearFieldError('androidPackage');
+                          setSaveError(null);
+                        }}
                       />
+                      <FieldError field="androidPackage" />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.iosBundleId ? '#EF4444' : 'var(--text-muted)' }}>
                         iOS Bundle ID (ios_bundle_id)
+                        {(platform === 'IOS' || platform === 'BOTH') && <span style={{ color: '#EF4444' }}> *</span>}
                       </label>
                       <input
                         type="text"
                         placeholder="com.example.app.ios"
                         className="input-control font-mono"
+                        style={fieldErrors.iosBundleId ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={iosBundleId}
-                        onChange={(e) => setIosBundleId(e.target.value)}
+                        onChange={(e) => {
+                          setIosBundleId(e.target.value);
+                          clearFieldError('iosBundleId');
+                          setSaveError(null);
+                        }}
                       />
+                      <FieldError field="iosBundleId" />
                     </div>
                   </div>
 
@@ -666,7 +836,11 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
                       <select
                         className="input-control"
                         value={platform}
-                        onChange={(e: any) => setPlatform(e.target.value)}
+                        onChange={(e: any) => {
+                          setPlatform(e.target.value);
+                          clearFieldError('androidPackage');
+                          clearFieldError('iosBundleId');
+                        }}
                       >
                         <option value="ANDROID">Android</option>
                         <option value="IOS">iOS</option>
@@ -674,15 +848,21 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.appVersion ? '#EF4444' : 'var(--text-muted)' }}>
                         Version
                       </label>
                       <input
                         type="text"
+                        placeholder="1.0.0"
                         className="input-control font-mono"
+                        style={fieldErrors.appVersion ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={appVersion}
-                        onChange={(e) => setAppVersion(e.target.value)}
+                        onChange={(e) => {
+                          setAppVersion(e.target.value);
+                          clearFieldError('appVersion');
+                        }}
                       />
+                      <FieldError field="appVersion" />
                     </div>
                     <div>
                       <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
@@ -700,26 +880,36 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.androidBuild ? '#EF4444' : 'var(--text-muted)' }}>
                         Android Build Number
                       </label>
                       <input
                         type="text"
                         className="input-control font-mono"
+                        style={fieldErrors.androidBuild ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={androidBuild}
-                        onChange={(e) => setAndroidBuild(e.target.value)}
+                        onChange={(e) => {
+                          setAndroidBuild(e.target.value);
+                          clearFieldError('androidBuild');
+                        }}
                       />
+                      <FieldError field="androidBuild" />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.iosBuild ? '#EF4444' : 'var(--text-muted)' }}>
                         iOS Build Number
                       </label>
                       <input
                         type="text"
                         className="input-control font-mono"
+                        style={fieldErrors.iosBuild ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={iosBuild}
-                        onChange={(e) => setIosBuild(e.target.value)}
+                        onChange={(e) => {
+                          setIosBuild(e.target.value);
+                          clearFieldError('iosBuild');
+                        }}
                       />
+                      <FieldError field="iosBuild" />
                     </div>
                   </div>
                 </div>
@@ -729,29 +919,39 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
               {activeTab === 'stores' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.googleplayLink ? '#EF4444' : 'var(--text-muted)' }}>
                       Google Play Store Link (googleplay_link)
                     </label>
                     <input
                       type="url"
                       placeholder="https://play.google.com/store/apps/details?id=..."
                       className="input-control font-mono"
+                      style={fieldErrors.googleplayLink ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                       value={googleplayLink}
-                      onChange={(e) => setGoogleplayLink(e.target.value)}
+                      onChange={(e) => {
+                        setGoogleplayLink(e.target.value);
+                        clearFieldError('googleplayLink');
+                      }}
                     />
+                    <FieldError field="googleplayLink" />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.appstoreLink ? '#EF4444' : 'var(--text-muted)' }}>
                       Apple App Store Link (appstore_link)
                     </label>
                     <input
                       type="url"
                       placeholder="https://apps.apple.com/app/..."
                       className="input-control font-mono"
+                      style={fieldErrors.appstoreLink ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                       value={appstoreLink}
-                      onChange={(e) => setAppstoreLink(e.target.value)}
+                      onChange={(e) => {
+                        setAppstoreLink(e.target.value);
+                        clearFieldError('appstoreLink');
+                      }}
                     />
+                    <FieldError field="appstoreLink" />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
@@ -1029,16 +1229,21 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
                     {/* Mode 2: Legacy Server Key */}
                     {firebaseConfigMode === 'KEY' && (
                       <div style={{ marginTop: '4px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.firebasePushKey ? '#EF4444' : 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
                           Firebase Legacy Server Key (Firebase_push_key)
                         </label>
                         <input
                           type="text"
                           placeholder="AAAA..."
                           className="input-control font-mono"
+                          style={fieldErrors.firebasePushKey ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                           value={firebasePushKey}
-                          onChange={(e) => setFirebasePushKey(e.target.value)}
+                          onChange={(e) => {
+                            setFirebasePushKey(e.target.value);
+                            clearFieldError('firebasePushKey');
+                          }}
                         />
+                        <FieldError field="firebasePushKey" />
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
                           Located in Firebase Console &gt; Project Settings &gt; Cloud Messaging &gt; Cloud Messaging API (Legacy)
                         </span>
@@ -1073,28 +1278,38 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.ownNotificationFreq ? '#EF4444' : 'var(--text-muted)' }}>
                         Own Notification Frequency (Days)
                       </label>
                       <input
                         type="number"
                         min="1"
                         className="input-control"
+                        style={fieldErrors.ownNotificationFreq ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={ownNotificationFreq}
-                        onChange={(e) => setOwnNotificationFreq(e.target.value)}
+                        onChange={(e) => {
+                          setOwnNotificationFreq(e.target.value);
+                          clearFieldError('ownNotificationFreq');
+                        }}
                       />
+                      <FieldError field="ownNotificationFreq" />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.crossNotificationFreq ? '#EF4444' : 'var(--text-muted)' }}>
                         Cross Notification Frequency (Days)
                       </label>
                       <input
                         type="number"
                         min="1"
                         className="input-control"
+                        style={fieldErrors.crossNotificationFreq ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                         value={crossNotificationFreq}
-                        onChange={(e) => setCrossNotificationFreq(e.target.value)}
+                        onChange={(e) => {
+                          setCrossNotificationFreq(e.target.value);
+                          clearFieldError('crossNotificationFreq');
+                        }}
                       />
+                      <FieldError field="crossNotificationFreq" />
                     </div>
                   </div>
 
@@ -1123,42 +1338,57 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
               {activeTab === 'policy' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.androidAdsPolicyUrl ? '#EF4444' : 'var(--text-muted)' }}>
                       Android Ads Policy URL (Android_ads_policy_URL)
                     </label>
                     <input
                       type="url"
                       placeholder="https://example.com/privacy-policy"
                       className="input-control font-mono"
+                      style={fieldErrors.androidAdsPolicyUrl ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                       value={androidAdsPolicyUrl}
-                      onChange={(e) => setAndroidAdsPolicyUrl(e.target.value)}
+                      onChange={(e) => {
+                        setAndroidAdsPolicyUrl(e.target.value);
+                        clearFieldError('androidAdsPolicyUrl');
+                      }}
                     />
+                    <FieldError field="androidAdsPolicyUrl" />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.iosAdsPolicyUrl ? '#EF4444' : 'var(--text-muted)' }}>
                       iOS Ads Policy URL (iOS_ads_policy_URL)
                     </label>
                     <input
                       type="url"
                       placeholder="https://example.com/privacy-policy-ios"
                       className="input-control font-mono"
+                      style={fieldErrors.iosAdsPolicyUrl ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                       value={iosAdsPolicyUrl}
-                      onChange={(e) => setIosAdsPolicyUrl(e.target.value)}
+                      onChange={(e) => {
+                        setIosAdsPolicyUrl(e.target.value);
+                        clearFieldError('iosAdsPolicyUrl');
+                      }}
                     />
+                    <FieldError field="iosAdsPolicyUrl" />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: fieldErrors.androidVideoUrl ? '#EF4444' : 'var(--text-muted)' }}>
                       Promo Video URL (android_video_url)
                     </label>
                     <input
                       type="url"
                       placeholder="https://youtube.com/watch?v=..."
                       className="input-control font-mono"
+                      style={fieldErrors.androidVideoUrl ? { borderColor: '#EF4444', background: 'rgba(239,68,68,0.04)' } : {}}
                       value={androidVideoUrl}
-                      onChange={(e) => setAndroidVideoUrl(e.target.value)}
+                      onChange={(e) => {
+                        setAndroidVideoUrl(e.target.value);
+                        clearFieldError('androidVideoUrl');
+                      }}
                     />
+                    <FieldError field="androidVideoUrl" />
                   </div>
                 </div>
               )}

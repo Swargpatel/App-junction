@@ -53,6 +53,9 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
   const [subLimit] = useState(8);
   const [subsData, setSubsData] = useState<{ subscriptions: any[]; pagination: any } | null>(null);
   const [subsLoading, setSubsLoading] = useState(false);
+  const [expandedPurchaseId, setExpandedPurchaseId] = useState<string | null>(null);
+  const [purchaseHistory, setPurchaseHistory] = useState<Record<string, any[]>>({});
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
 
   // Fetch High-Level Stats & Cancellations
   useEffect(() => {
@@ -105,6 +108,31 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
       console.error('Error fetching subscriptions:', err);
     } finally {
       setSubsLoading(false);
+    }
+  };
+
+  const togglePurchaseHistory = async (purchaseId: string) => {
+    if (expandedPurchaseId === purchaseId) {
+      setExpandedPurchaseId(null);
+      return;
+    }
+
+    setExpandedPurchaseId(purchaseId);
+    if (purchaseHistory[purchaseId]) return;
+
+    setHistoryLoadingId(purchaseId);
+    try {
+      const res = await api.get(`/admin/analytics/subscriptions/${purchaseId}/history`);
+      if (res.data.success) {
+        setPurchaseHistory((current) => ({
+          ...current,
+          [purchaseId]: res.data.history || []
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching user purchase history:', err);
+    } finally {
+      setHistoryLoadingId(null);
     }
   };
 
@@ -444,12 +472,12 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
                         rec.cancellations && rec.cancellations.length > 0
                           ? rec.cancellations[rec.cancellations.length - 1]
                           : {
-                              reason_text: rec.reason_text || 'No reason specified',
-                              custom_feedback: rec.custom_feedback || '',
-                              plan_name: rec.plan_name || '',
-                              total_spent: rec.total_spent || 0,
-                              cancelled_at: rec.cancelled_at || rec.updated_at
-                            };
+                            reason_text: rec.reason_text || 'No reason specified',
+                            custom_feedback: rec.custom_feedback || '',
+                            plan_name: rec.plan_name || '',
+                            total_spent: rec.total_spent || 0,
+                            cancelled_at: rec.cancelled_at || rec.updated_at
+                          };
 
                       return (
                         <React.Fragment key={rec._id}>
@@ -824,23 +852,26 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
                       <th style={{ padding: '12px 14px' }}>Purchase Date</th>
                       <th style={{ padding: '12px 14px' }}>Expiry Date</th>
                       <th style={{ padding: '12px 14px' }}>Auto-Renew</th>
+                      <th style={{ padding: '12px 14px' }}>Details</th>
                       <th style={{ padding: '12px 14px', textAlign: 'right' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {subsData.subscriptions.map((sub: any) => {
-                      const isExpired = sub.expiry_date && new Date(sub.expiry_date) < new Date();
+                      const isHistoryExpanded = expandedPurchaseId === sub._id;
+                      const historyEntries = purchaseHistory[sub._id] || [];
                       const statusColor =
                         sub.status === 'ACTIVE' ? '#10B981' : sub.status === 'CANCELLED' ? '#F43F5E' : '#64748B';
 
                       return (
-                        <tr
-                          key={sub._id}
-                          style={{
-                            borderBottom: '1px solid var(--border-color)',
-                            transition: 'background 0.15s ease'
-                          }}
-                        >
+                        <React.Fragment key={sub._id}>
+                          <tr
+                            style={{
+                              borderBottom: isHistoryExpanded ? 'none' : '1px solid var(--border-color)',
+                              transition: 'background 0.15s ease',
+                              background: isHistoryExpanded ? 'var(--bg-pill)' : 'transparent'
+                            }}
+                          >
                           {/* User / Device */}
                           <td style={{ padding: '14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -898,6 +929,9 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontFamily: 'monospace' }}>
                               {sub.product_id}
                             </div>
+                            <div style={{ fontSize: '0.68rem', color: '#10B981', marginTop: '3px' }}>
+                              {sub.plan_type || 'SUBSCRIPTION'} · {String(sub.event_type || 'INITIAL_PURCHASE').replace('_', ' ')}
+                            </div>
                           </td>
 
                           {/* Amount */}
@@ -921,8 +955,8 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
                           <td style={{ padding: '14px', fontSize: '0.78rem', color: 'var(--text-dim)' }}>
                             {sub.expiry_date
                               ? new Date(sub.expiry_date).toLocaleString([], {
-                                  dateStyle: 'medium'
-                                })
+                                dateStyle: 'medium'
+                              })
                               : 'Never / Lifetime'}
                           </td>
 
@@ -944,6 +978,30 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
                           </td>
 
                           {/* Status */}
+                          <td style={{ padding: '14px' }}>
+                            <button
+                              onClick={() => togglePurchaseHistory(sub._id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '5px 9px',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)',
+                                background: isHistoryExpanded ? '#10B981' : 'var(--bg-pill)',
+                                color: isHistoryExpanded ? '#FFFFFF' : 'var(--text-main)',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <History size={13} />
+                              {historyLoadingId === sub._id ? 'Loading...' : isHistoryExpanded ? 'Hide' : 'Details'}
+                              {isHistoryExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            </button>
+                          </td>
+
+                          {/* Status */}
                           <td style={{ padding: '14px', textAlign: 'right' }}>
                             <span
                               style={{
@@ -962,7 +1020,68 @@ export const RevenueView: React.FC<RevenueViewProps> = ({ selectedAppId }) => {
                               {sub.status}
                             </span>
                           </td>
-                        </tr>
+                          </tr>
+
+                          {isHistoryExpanded && (
+                            <tr style={{ background: 'var(--bg-pill)', borderBottom: '1px solid var(--border-color)' }}>
+                              <td colSpan={9} style={{ padding: '16px 20px' }}>
+                                <div
+                                  style={{
+                                    padding: '14px',
+                                    borderRadius: 'var(--radius-md)',
+                                    background: 'var(--bg-panel)',
+                                    border: '1px solid var(--border-color)'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                    <History size={14} color="#10B981" />
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-heading)' }}>
+                                      All past and current purchases for this user
+                                    </span>
+                                  </div>
+                                  {historyLoadingId === sub._id ? (
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Loading purchase history...</div>
+                                  ) : historyEntries.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      {historyEntries.map((entry: any, index: number) => (
+                                        <div
+                                          key={entry._id || index}
+                                          style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr',
+                                            gap: '12px',
+                                            padding: '10px 12px',
+                                            borderRadius: 'var(--radius-sm)',
+                                            background: 'var(--bg-pill)',
+                                            border: '1px solid var(--border-color)',
+                                            fontSize: '0.76rem'
+                                          }}
+                                        >
+                                          <div>
+                                            <div style={{ fontWeight: 800, color: 'var(--text-heading)' }}>
+                                              {entry.plan_name || entry.product_id || 'Plan'}
+                                            </div>
+                                            <div style={{ color: 'var(--text-dim)', fontFamily: 'monospace', fontSize: '0.68rem' }}>
+                                              {entry.product_id || 'Unknown product'}
+                                            </div>
+                                          </div>
+                                          <div><strong>Type:</strong> {entry.plan_type || 'SUBSCRIPTION'}</div>
+                                          <div><strong>Event:</strong> {String(entry.event_type || '').replace('_', ' ')}</div>
+                                          <div><strong>Amount:</strong> {entry.currency || 'USD'} {Number(entry.amount || 0).toFixed(2)}</div>
+                                          <div><strong>Date:</strong> {entry.event_date ? new Date(entry.event_date).toLocaleString() : 'Unknown'}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                      No purchase history has been recorded for this user yet.
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>

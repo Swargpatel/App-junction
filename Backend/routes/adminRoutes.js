@@ -26,6 +26,7 @@ const {
   getRevenueAnalytics,
   getCancellationAnalytics,
   getSubscriptionsList,
+  getSubscriptionHistory,
   getUserDistribution
 } = require('../controllers/analyticsController');
 
@@ -81,6 +82,7 @@ router.get('/analytics/overview', protectAdmin, getDashboardOverview);
 router.get('/analytics/revenue', protectAdmin, getRevenueAnalytics);
 router.get('/analytics/cancellations', protectAdmin, getCancellationAnalytics);
 router.get('/analytics/subscriptions', protectAdmin, getSubscriptionsList);
+router.get('/analytics/subscriptions/:id/history', protectAdmin, getSubscriptionHistory);
 router.get('/analytics/users', protectAdmin, getUserDistribution);
 
 // ==================== CRASH DESK ====================

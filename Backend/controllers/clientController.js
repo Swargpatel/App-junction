@@ -120,13 +120,16 @@ const initApp = async (req, res) => {
     }
 
     // Fetch active cross marketing promotions for this app or its group
-    const activePromotions = await CrossNotification.find({
+    // group_id may be null if app has no group assigned — safely handle with optional chaining
+    const groupId = app.group_id?._id || app.group_id || null;
+    const promotionFilter = {
       status: 'ACTIVE',
-      $or: [
-        { source_app_id: app._id },
-        { target_group_id: app.group_id._id || app.group_id }
-      ]
-    })
+      $or: [{ source_app_id: app._id }]
+    };
+    if (groupId) {
+      promotionFilter.$or.push({ target_group_id: groupId });
+    }
+    const activePromotions = await CrossNotification.find(promotionFilter)
       .populate('destination_app_id', 'app_name package_name app_icon store_url_android store_url_ios')
       .limit(5);
 
@@ -249,13 +252,20 @@ const syncIap = async (req, res) => {
         status: 'ACTIVE'
       });
     } else {
-      // Renewal or update
+      // Renewal or update — update ALL fields sent by client, not just expiry & amount
       isRenewal = true;
       const prevExpiry = iap.expiry_date;
+
+      // Always override with whatever the client sends
+      if (product_id) iap.product_id = product_id;
+      if (plan_name) iap.plan_name = plan_name;
+      if (plan_type) iap.plan_type = plan_type;
+      if (currency) iap.currency = currency;
+      if (transaction_id) iap.transaction_id = transaction_id;
+      if (amount) iap.amount = Number(amount);
       iap.expiry_date = expiry_date ? new Date(expiry_date) : iap.expiry_date;
       iap.auto_renewing = auto_renewing !== undefined ? auto_renewing : iap.auto_renewing;
       iap.status = 'ACTIVE';
-      if (amount) iap.amount = Number(amount);
       await iap.save();
 
       // Log renewal history
@@ -263,11 +273,16 @@ const syncIap = async (req, res) => {
         user_id: user._id,
         app_id: app._id,
         inapppurchase_id: iap._id,
+        purchase_token: iap.purchase_token,
         transaction_id: transaction_id || '',
+        product_id: iap.product_id,
+        plan_name: iap.plan_name,
+        plan_type: iap.plan_type,
         event_type: 'AUTO_RENEWAL',
         amount: Number(amount) || iap.amount,
         currency: currency || iap.currency,
         event_date: new Date(),
+        auto_renewing: iap.auto_renewing,
         previous_expiry_date: prevExpiry,
         new_expiry_date: iap.expiry_date,
         raw_payload: raw_payload || {}
@@ -280,11 +295,16 @@ const syncIap = async (req, res) => {
         user_id: user._id,
         app_id: app._id,
         inapppurchase_id: iap._id,
+        purchase_token: iap.purchase_token,
         transaction_id: transaction_id || '',
+        product_id: iap.product_id,
+        plan_name: iap.plan_name,
+        plan_type: iap.plan_type,
         event_type: 'INITIAL_PURCHASE',
         amount: Number(amount) || 0,
         currency: currency || 'USD',
         event_date: new Date(),
+        auto_renewing: iap.auto_renewing,
         new_expiry_date: iap.expiry_date,
         raw_payload: raw_payload || {}
       });
@@ -341,10 +361,16 @@ const submitCancelReason = async (req, res) => {
           user_id: user._id,
           app_id: app._id,
           inapppurchase_id: iap._id,
+          purchase_token: iap.purchase_token,
+          product_id: iap.product_id,
+          plan_name: iap.plan_name,
+          plan_type: iap.plan_type,
           event_type: 'CANCELLATION',
           amount: 0,
           currency: iap.currency,
-          event_date: new Date()
+          event_date: new Date(),
+          auto_renewing: false,
+          new_expiry_date: iap.expiry_date
         });
       }
     }

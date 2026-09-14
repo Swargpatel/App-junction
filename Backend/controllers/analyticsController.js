@@ -368,9 +368,7 @@ const getSubscriptionsList = async (req, res) => {
     if (req.query.app_id && mongoose.Types.ObjectId.isValid(req.query.app_id)) {
       filters.app_id = new mongoose.Types.ObjectId(req.query.app_id);
     }
-    if (req.query.status && req.query.status !== 'ALL') {
-      filters.status = req.query.status;
-    }
+    if (req.query.status && req.query.status !== 'ALL') filters.status = req.query.status;
 
     if (req.query.startDate || req.query.endDate) {
       filters.purchase_date = {};
@@ -404,6 +402,28 @@ const getSubscriptionsList = async (req, res) => {
         limit
       }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== USER PURCHASE HISTORY DETAIL ====================
+const getSubscriptionHistory = async (req, res) => {
+  try {
+    const purchase = await InAppPurchase.findById(req.params.id)
+      .populate('app_id', 'app_name package_name')
+      .populate('user_id', 'device_unique_Id country os_type app_version_no');
+
+    if (!purchase) {
+      return res.status(404).json({ success: false, message: 'Purchase record not found' });
+    }
+
+    const history = await SubscriptionHistory.find({
+      user_id: purchase.user_id._id || purchase.user_id,
+      app_id: purchase.app_id._id || purchase.app_id
+    }).sort({ event_date: -1 });
+
+    res.json({ success: true, current_purchase: purchase, history });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -454,5 +474,6 @@ module.exports = {
   getRevenueAnalytics,
   getCancellationAnalytics,
   getSubscriptionsList,
+  getSubscriptionHistory,
   getUserDistribution
 };
