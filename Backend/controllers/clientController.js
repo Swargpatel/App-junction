@@ -141,7 +141,27 @@ const initApp = async (req, res) => {
       app_info: {
         app_name: app.app_name,
         package_name: app.package_name,
-        latest_version: app.app_version
+        latest_version: app.app_version,
+        android_latest_build_number: app.android_latest_build_number,
+        ios_latest_build_number: app.ios_latest_build_number
+      },
+      app_config: {
+        is_android_live: app.is_android_live,
+        is_iOS_live: app.is_iOS_live,
+        googleplay_link: app.googleplay_link,
+        appstore_link: app.appstore_link,
+        is_push_marketing: app.is_push_marketing,
+        is_cross_push_marketing: app.is_cross_push_marketing,
+        is_cross_app_ads_banner_marketing: app.is_cross_app_ads_banner_marketing,
+        is_adsbanner_marketing: app.is_adsbanner_marketing,
+        Own_notification_timePrefrance: app.Own_notification_timePrefrance,
+        Cross_app_notification_time_prefrance: app.Cross_app_notification_time_prefrance,
+        Own_app_notification_frequancy: app.Own_app_notification_frequancy,
+        Cross_app_notification_frequancy: app.Cross_app_notification_frequancy,
+        Android_ads_policy_URL: app.Android_ads_policy_URL,
+        iOS_ads_policy_URL: app.iOS_ads_policy_URL,
+        android_video_url: app.android_video_url,
+        ios_video_url: app.ios_video_url
       },
       active_promotions: activePromotions
     });

@@ -10,7 +10,7 @@ const inAppPurchaseSchema = new mongoose.Schema(
     plan_name: { type: String, default: '' },
     plan_type: {
       type: String,
-      enum: ['SUBSCRIPTION', 'CONSUMABLE', 'NON_CONSUMABLE'],
+      enum: ['SUBSCRIPTION', 'ONE_TIME', 'CONSUMABLE'],
       default: 'SUBSCRIPTION'
     },
     amount: { type: Number, required: true, default: 0 },

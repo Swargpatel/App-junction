@@ -153,14 +153,14 @@ const createApp = async (req, res) => {
     const body = req.body;
     const app_name = body.app_name?.trim();
     const group_id = body.group_id;
-    const android_package_name = body.android_package_name?.trim() || body.package_name?.trim();
+    const android_package_name = body.android_package_name?.trim() || body.package_name?.trim() || '';
     const ios_bundle_id = body.ios_bundle_id?.trim() || body.bundle_id?.trim() || '';
-    const package_name = android_package_name || ios_bundle_id;
+    const package_name = android_package_name || ios_bundle_id || (`com.app.${(app_name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '') || 'app'}.${Date.now()}`);
 
-    if (!app_name || !package_name) {
+    if (!app_name) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide app_name and android_package_name (or package_name)'
+        message: 'Please provide application name (app_name)'
       });
     }
 
@@ -172,12 +172,19 @@ const createApp = async (req, res) => {
       }
     }
 
-    const existingPackage = await App.findOne({ package_name });
-    if (existingPackage) {
-      return res.status(400).json({
-        success: false,
-        message: 'An application with this package name already exists'
+    if (android_package_name || ios_bundle_id) {
+      const existingPackage = await App.findOne({
+        $or: [
+          ...(android_package_name ? [{ android_package_name }, { package_name: android_package_name }] : []),
+          ...(ios_bundle_id ? [{ ios_bundle_id }, { package_name: ios_bundle_id }] : [])
+        ]
       });
+      if (existingPackage) {
+        return res.status(400).json({
+          success: false,
+          message: 'An application with this package name or bundle ID already exists'
+        });
+      }
     }
 
     let logo_photo = '';
@@ -217,17 +224,26 @@ const createApp = async (req, res) => {
       is_cross_push_marketing: body.is_cross_push_marketing !== undefined ? body.is_cross_push_marketing : true,
       is_cross_app_ads_banner_marketing: body.is_cross_app_ads_banner_marketing !== undefined ? body.is_cross_app_ads_banner_marketing : true,
       is_adsbanner_marketing: body.is_adsbanner_marketing !== undefined ? body.is_adsbanner_marketing : true,
+      vertical_banner_photo: Array.isArray(body.vertical_banner_photo) ? body.vertical_banner_photo : body.vertical_banner_photo ? [body.vertical_banner_photo] : [],
+      horizontal_banner_photo: Array.isArray(body.horizontal_banner_photo) ? body.horizontal_banner_photo : body.horizontal_banner_photo ? [body.horizontal_banner_photo] : [],
+      is_not_available_playstore: body.is_not_available_playstore !== undefined ? body.is_not_available_playstore : false,
+      new_google_play_link: body.new_google_play_link || '',
+      is_not_available_appstore: body.is_not_available_appstore !== undefined ? body.is_not_available_appstore : false,
+      new_apple_app_link: body.new_apple_app_link || '',
       Own_notification_timePrefrance: body.Own_notification_timePrefrance || '20:00',
       Cross_app_notification_time_prefrance: body.Cross_app_notification_time_prefrance || '20:00',
       Own_app_notification_frequancy: body.Own_app_notification_frequancy || '1',
       Cross_app_notification_frequancy: body.Cross_app_notification_frequancy || '2',
+      own_app_notification_message: Array.isArray(body.own_app_notification_message) ? body.own_app_notification_message : body.own_app_notification_message ? [body.own_app_notification_message] : [],
+      cross_notification_message_text: Array.isArray(body.cross_notification_message_text) ? body.cross_notification_message_text : body.cross_notification_message_text ? [body.cross_notification_message_text] : [],
       android_video_url: body.android_video_url || '',
       ios_video_url: body.ios_video_url || '',
       Android_ads_policy_URL: body.Android_ads_policy_URL || '',
       iOS_ads_policy_URL: body.iOS_ads_policy_URL || '',
-      google_play_account: body.google_play_account || '',
-      apple_app_store_account: body.apple_app_store_account || '',
-      ads_account: body.ads_account || '',
+      google_play_account: body.google_play_account || body.play_console_account || '',
+      apple_app_store_account: body.apple_app_store_account || body.apple_store_account || '',
+      ads_account: body.ads_account || body.admob_account || '',
+      country_id: Array.isArray(body.country_id) ? body.country_id : body.country_id ? [body.country_id] : ['ALL'],
       status: 'ACTIVE'
     });
 
@@ -251,13 +267,17 @@ const updateApp = async (req, res) => {
       'app_name', 'android_package_name', 'ios_bundle_id', 'group_id', 'platform',
       'app_age_rating', 'app_version', 'android_latest_build_number', 'ios_latest_build_number',
       'is_android_live', 'is_iOS_live', 'googleplay_link', 'appstore_link',
-      'store_url_android', 'store_url_ios', 'Firebase_push_key', 'firebase_server_key',
+      'store_url_android', 'store_url_ios', 'is_not_available_playstore', 'new_google_play_link',
+      'is_not_available_appstore', 'new_apple_app_link',
+      'Firebase_push_key', 'firebase_server_key',
       'firebase_service_account_json', 'firebase_project_id', 'firebase_client_email',
       'is_push_marketing', 'is_cross_push_marketing', 'is_cross_app_ads_banner_marketing',
-      'is_adsbanner_marketing', 'Own_notification_timePrefrance', 'Cross_app_notification_time_prefrance',
-      'Own_app_notification_frequancy', 'Cross_app_notification_frequancy', 'android_video_url',
-      'ios_video_url', 'Android_ads_policy_URL', 'iOS_ads_policy_URL', 'google_play_account',
-      'apple_app_store_account', 'ads_account', 'status'
+      'is_adsbanner_marketing', 'vertical_banner_photo', 'horizontal_banner_photo',
+      'Own_notification_timePrefrance', 'Cross_app_notification_time_prefrance',
+      'Own_app_notification_frequancy', 'Cross_app_notification_frequancy',
+      'own_app_notification_message', 'cross_notification_message_text',
+      'android_video_url', 'ios_video_url', 'Android_ads_policy_URL', 'iOS_ads_policy_URL',
+      'google_play_account', 'apple_app_store_account', 'ads_account', 'country_id', 'logo_photo', 'app_icon', 'status'
     ];
 
     updatableFields.forEach((field) => {
@@ -266,9 +286,19 @@ const updateApp = async (req, res) => {
       }
     });
 
+    if (req.body.apple_store_account !== undefined && req.body.apple_app_store_account === undefined) {
+      app.apple_app_store_account = req.body.apple_store_account;
+    }
+
     if (req.file) {
       app.logo_photo = `/uploads/${req.file.filename}`;
       app.app_icon = `/uploads/${req.file.filename}`;
+    } else if (req.body.logo_photo !== undefined) {
+      app.logo_photo = req.body.logo_photo;
+      app.app_icon = req.body.logo_photo;
+    } else if (req.body.app_icon !== undefined) {
+      app.logo_photo = req.body.app_icon;
+      app.app_icon = req.body.app_icon;
     }
 
     await app.save();

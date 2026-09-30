@@ -11,7 +11,7 @@ const subscriptionHistorySchema = new mongoose.Schema(
     plan_name: { type: String, trim: true, default: '' },
     plan_type: {
       type: String,
-      enum: ['SUBSCRIPTION', 'CONSUMABLE', 'NON_CONSUMABLE'],
+      enum: ['SUBSCRIPTION', 'ONE_TIME', 'CONSUMABLE'],
       default: 'SUBSCRIPTION'
     },
     event_type: {

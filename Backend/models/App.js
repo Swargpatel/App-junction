@@ -8,7 +8,7 @@ const appSchema = new mongoose.Schema(
     group_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', default: null },
     android_package_name: { type: String, trim: true, default: '' },
     ios_bundle_id: { type: String, trim: true, default: '' },
-    package_name: { type: String, required: true, unique: true, trim: true }, // Unified package identifier
+    package_name: { type: String, trim: true, default: '' }, // Unified package identifier
     app_age_rating: { type: String, default: '3+' },
     logo_photo: { type: String, default: '' },
     app_icon: { type: String, default: '' },
@@ -42,10 +42,11 @@ const appSchema = new mongoose.Schema(
     is_not_available_appstore: { type: Boolean, default: false },
     new_apple_app_link: { type: String, default: '' },
 
-    // Developer Accounts
+    // Developer Accounts & Target Countries
     google_play_account: { type: String, default: '' },
     apple_app_store_account: { type: String, default: '' },
     ads_account: { type: String, default: '' },
+    country_id: { type: [String], default: ['ALL'] },
 
     // Build Numbers & Version
     app_version: { type: String, default: '1.0.0' },
@@ -89,11 +90,14 @@ const appSchema = new mongoose.Schema(
   }
 );
 
-// Always ensure app_key and api_key are identical
+// Always ensure app_key and api_key are identical, and package_name is populated
 appSchema.pre('validate', function () {
   const unifiedKey = this.app_key || this.api_key || ('app_' + crypto.randomBytes(16).toString('hex'));
   this.app_key = unifiedKey;
   this.api_key = unifiedKey;
+  if (!this.package_name) {
+    this.package_name = this.android_package_name || this.ios_bundle_id || ('com.app.' + crypto.randomBytes(6).toString('hex'));
+  }
   if (!this.api_secret) {
     this.api_secret = crypto.randomBytes(32).toString('hex');
   }
@@ -103,6 +107,9 @@ appSchema.pre('save', function () {
   const unifiedKey = this.app_key || this.api_key || ('app_' + crypto.randomBytes(16).toString('hex'));
   this.app_key = unifiedKey;
   this.api_key = unifiedKey;
+  if (!this.package_name) {
+    this.package_name = this.android_package_name || this.ios_bundle_id || ('com.app.' + crypto.randomBytes(6).toString('hex'));
+  }
   if (!this.api_secret) {
     this.api_secret = crypto.randomBytes(32).toString('hex');
   }

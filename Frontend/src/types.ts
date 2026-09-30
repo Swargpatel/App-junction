@@ -10,6 +10,20 @@ export interface Group {
   created_at: string;
 }
 
+export interface Account {
+  _id: string;
+  app_id?: string | App;
+  account_name: string;
+  store_type: 'GOOGLE_PLAY' | 'APPLE_APP_STORE' | 'ADMOB' | 'PAYMENT_GATEWAY' | string;
+  developer_email?: string;
+  account_id?: string;
+  notes?: string;
+  credentials_json?: any;
+  status: 'ACTIVE' | 'INACTIVE';
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface App {
   _id: string;
   app_name: string;
@@ -37,6 +51,7 @@ export interface App {
   google_play_account?: string;
   apple_app_store_account?: string;
   ads_account?: string;
+  country_id?: string[] | string;
   Firebase_push_key?: string;
   firebase_server_key?: string;
   firebase_service_account_json?: string;
@@ -46,10 +61,18 @@ export interface App {
   is_cross_push_marketing?: boolean;
   is_cross_app_ads_banner_marketing?: boolean;
   is_adsbanner_marketing?: boolean;
+  vertical_banner_photo?: string[];
+  horizontal_banner_photo?: string[];
+  is_not_available_playstore?: boolean;
+  new_google_play_link?: string;
+  is_not_available_appstore?: boolean;
+  new_apple_app_link?: string;
   Own_notification_timePrefrance?: string;
   Cross_app_notification_time_prefrance?: string;
   Own_app_notification_frequancy?: string;
   Cross_app_notification_frequancy?: string;
+  own_app_notification_message?: string[];
+  cross_notification_message_text?: string[];
   Android_ads_policy_URL?: string;
   iOS_ads_policy_URL?: string;
   android_video_url?: string;

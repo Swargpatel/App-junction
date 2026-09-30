@@ -86,7 +86,7 @@ const getDashboardOverview = async (req, res) => {
             $sum: { $cond: [{ $eq: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
           },
           consumableTotal: {
-            $sum: { $cond: [{ $eq: ['$plan_type', 'CONSUMABLE'] }, '$amount', 0] }
+            $sum: { $cond: [{ $ne: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
           }
         }
       }
@@ -174,7 +174,7 @@ const getRevenueAnalytics = async (req, res) => {
             $sum: { $cond: [{ $eq: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
           },
           consumable_revenue: {
-            $sum: { $cond: [{ $eq: ['$plan_type', 'CONSUMABLE'] }, '$amount', 0] }
+            $sum: { $cond: [{ $ne: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
           },
           purchase_count: { $sum: 1 }
         }
