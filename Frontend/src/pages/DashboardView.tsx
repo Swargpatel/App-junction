@@ -19,6 +19,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return <div style={{ padding: '40px', color: 'var(--text-muted)' }}>Loading analytics dashboard...</div>;
   }
 
+  const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
+
   // Calculate SVG chart coordinates for revenue trend
   const maxRevenue = Math.max(...revenueTrends.map((t) => t.total_revenue), 10);
   const chartHeight = 180;
@@ -26,14 +28,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const points = revenueTrends.map((item, index) => {
     const x = (index / Math.max(revenueTrends.length - 1, 1)) * chartWidth;
-    const y = chartHeight - (item.total_revenue / maxRevenue) * (chartHeight - 30) - 15;
-    return `${x},${y}`;
+    const y = chartHeight - (item.total_revenue / maxRevenue) * (chartHeight - 40) - 20;
+    return { x, y, item };
   });
 
-  const pathData = points.length > 0 ? `M ${points.join(' L ')}` : '';
+  const pathData = points.length > 0 ? `M ${points.map((p) => `${p.x},${p.y}`).join(' L ')}` : '';
   const areaData =
     points.length > 0
-      ? `M 0,${chartHeight} L ${points.join(' L ')} L ${chartWidth},${chartHeight} Z`
+      ? `M 0,${chartHeight} L ${points.map((p) => `${p.x},${p.y}`).join(' L ')} L ${chartWidth},${chartHeight} Z`
       : '';
 
   return (
@@ -48,8 +50,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 4 Hero KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+      {/* 3 Hero KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
         {/* Card 1: Installs */}
         <div className="stat-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -81,51 +83,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Repeat Users */}
+        {/* Card 2: Total Revenue */}
         <div className="stat-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Repeat Customers
-              </span>
-              <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#FFFFFF', marginTop: '6px' }}>
-                {overview.repeat_customers.toLocaleString()}
-              </div>
-            </div>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                background: 'rgba(16, 185, 129, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Users size={20} color="#34D399" />
-            </div>
-          </div>
-          <div style={{ marginTop: '14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: '#818CF8', fontWeight: 700 }}>
-              {overview.total_installs > 0
-                ? ((overview.repeat_customers / overview.total_installs) * 100).toFixed(1)
-                : 0}
-              %
-            </span>
-            <span style={{ color: 'var(--text-dim)' }}>retention rate</span>
-          </div>
-        </div>
-
-        {/* Card 3: Today's Revenue */}
-        <div className="stat-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Today's Total Revenue
+                Total Revenue
               </span>
               <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#10B981', marginTop: '6px' }}>
-                ${overview.today_revenue.toFixed(2)}
+                ${overview.all_time_revenue.toFixed(2)}
               </div>
             </div>
             <div
@@ -143,6 +109,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           <div style={{ marginTop: '14px', fontSize: '0.75rem', display: 'flex', gap: '10px', color: 'var(--text-dim)' }}>
+            <span>Today: <strong style={{ color: '#34D399' }}>+${overview.today_revenue.toFixed(2)}</strong></span>
+            <span>•</span>
             <span>Sub: <strong style={{ color: '#FFF' }}>${overview.today_subscription_revenue.toFixed(2)}</strong></span>
             <span>•</span>
             <span>Consumable: <strong style={{ color: '#FFF' }}>${overview.today_consumable_revenue.toFixed(2)}</strong></span>
@@ -156,7 +124,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                 Active Subscriptions
               </span>
-              <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#EC4899', marginTop: '6px' }}>
+              <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#10B981', marginTop: '6px' }}>
                 {overview.active_subscriptions}
               </div>
             </div>
@@ -165,18 +133,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 width: '42px',
                 height: '42px',
                 borderRadius: '12px',
-                background: 'rgba(236, 72, 153, 0.15)',
+                background: 'rgba(16, 185, 129, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
             >
-              <Activity size={20} color="#EC4899" />
+              <Activity size={20} color="#10B981" />
             </div>
           </div>
           <div style={{ marginTop: '14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: 'var(--text-dim)' }}>All-time total:</span>
-            <span style={{ color: '#FFFFFF', fontWeight: 700 }}>${overview.all_time_revenue.toFixed(2)}</span>
+            <span style={{ color: 'var(--text-dim)' }}>Live Status:</span>
+            <span style={{ color: '#34D399', fontWeight: 700 }}>{overview.active_subscriptions} Active Subscribers</span>
           </div>
         </div>
       </div>
@@ -194,7 +162,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* SVG Line / Area Chart */}
-          <div style={{ position: 'relative', width: '100%', height: `${chartHeight}px`, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: '100%', height: `${chartHeight}px` }}>
+            {/* Tooltip on Hover */}
+            {hoveredIndex !== null && points[hoveredIndex] && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: 'rgba(15, 23, 42, 0.95)',
+                  border: '1px solid rgba(99, 102, 241, 0.4)',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                  fontSize: '0.75rem',
+                  zIndex: 10,
+                  pointerEvents: 'none'
+                }}
+              >
+                <div style={{ color: '#818CF8', fontWeight: 700 }}>
+                  {points[hoveredIndex].item._id}
+                </div>
+                <div style={{ color: '#10B981', fontWeight: 800, fontSize: '0.9rem', marginTop: '2px' }}>
+                  ${points[hoveredIndex].item.total_revenue.toFixed(2)}
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '2px' }}>
+                  Sub: ${points[hoveredIndex].item.subscription_revenue.toFixed(2)} | Cons: ${points[hoveredIndex].item.consumable_revenue.toFixed(2)}
+                </div>
+              </div>
+            )}
+
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
               style={{ width: '100%', height: '100%', overflow: 'visible' }}
@@ -207,39 +204,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </defs>
 
               {/* Grid Lines */}
-              <line x1="0" y1="30" x2={chartWidth} y2="30" stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
-              <line x1="0" y1="90" x2={chartWidth} y2="90" stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
-              <line x1="0" y1="150" x2={chartWidth} y2="150" stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
+              <line x1="0" y1="20" x2={chartWidth} y2="20" stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
+              <line x1="0" y1="80" x2={chartWidth} y2="80" stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
+              <line x1="0" y1="140" x2={chartWidth} y2="140" stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
 
               {/* Filled Area */}
               {areaData && <path d={areaData} fill="url(#revenueGrad)" />}
 
               {/* Stroke Curve */}
               {pathData && (
-                <path d={pathData} fill="none" stroke="#6366F1" strokeWidth="3" strokeLinecap="round" />
+                <path d={pathData} fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               )}
 
               {/* Points */}
               {points.map((pt, i) => {
-                const [cx, cy] = pt.split(',');
+                const isHovered = hoveredIndex === i;
+                const hasRevenue = pt.item.total_revenue > 0;
                 return (
-                  <circle
+                  <g
                     key={i}
-                    cx={cx}
-                    cy={cy}
-                    r="4"
-                    fill="#EC4899"
-                    stroke="#FFFFFF"
-                    strokeWidth="2"
-                  />
+                    onMouseEnter={() => setHoveredIndex(i)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {/* Larger transparent touch area for hover */}
+                    <circle cx={pt.x} cy={pt.y} r="12" fill="transparent" />
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 6 : hasRevenue ? 4 : 2}
+                      fill={hasRevenue ? '#10B981' : '#6366F1'}
+                      stroke="#FFFFFF"
+                      strokeWidth={isHovered ? 2.5 : hasRevenue ? 1.5 : 0}
+                    />
+                  </g>
                 );
               })}
             </svg>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px', fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-            <span>{revenueTrends[0]?._id || 'Start'}</span>
-            <span>{revenueTrends[Math.floor(revenueTrends.length / 2)]?._id || 'Mid'}</span>
+            <span>{revenueTrends[0]?._id || 'Start Date'}</span>
+            <span>{revenueTrends[Math.floor(revenueTrends.length / 2)]?._id || 'Mid Date'}</span>
             <span>{revenueTrends[revenueTrends.length - 1]?._id || 'Today'}</span>
           </div>
         </div>

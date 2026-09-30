@@ -139,118 +139,138 @@ const getRevenueAnalytics = async (req, res) => {
   try {
     const filters = buildFilters(req.query);
 
-    // Date Filtering for InAppPurchase
+    // Date Filtering for InAppPurchase and SubscriptionHistory
     const iapDateFilter = {};
+    const histDateFilter = {};
+    let startD = new Date();
+    let endD = new Date();
+
     if (req.query.startDate || req.query.endDate) {
       iapDateFilter.purchase_date = {};
-      if (req.query.startDate) iapDateFilter.purchase_date.$gte = new Date(req.query.startDate);
-      if (req.query.endDate) {
-        const end = new Date(req.query.endDate);
-        end.setHours(23, 59, 59, 999);
-        iapDateFilter.purchase_date.$lte = end;
-      }
-    } else {
-      const days = parseInt(req.query.days) || 30;
-      const sDate = new Date();
-      sDate.setDate(sDate.getDate() - days);
-      sDate.setHours(0, 0, 0, 0);
-      iapDateFilter.purchase_date = { $gte: sDate };
-    }
-
-    const revenueTrends = await InAppPurchase.aggregate([
-      {
-        $match: {
-          ...filters,
-          ...iapDateFilter
-        }
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$purchase_date' }
-          },
-          total_revenue: { $sum: '$amount' },
-          subscription_revenue: {
-            $sum: { $cond: [{ $eq: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
-          },
-          consumable_revenue: {
-            $sum: { $cond: [{ $ne: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
-          },
-          purchase_count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]);
-
-    // Breakdown by App
-    const appBreakdown = await InAppPurchase.aggregate([
-      {
-        $match: {
-          ...filters,
-          ...iapDateFilter
-        }
-      },
-      {
-        $group: {
-          _id: '$app_id',
-          revenue: { $sum: '$amount' },
-          transactions: { $sum: 1 }
-        }
-      },
-      {
-        $lookup: {
-          from: 'tbl_app',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'app'
-        }
-      },
-      { $unwind: '$app' },
-      {
-        $project: {
-          app_id: '$_id',
-          app_name: '$app.app_name',
-          package_name: '$app.package_name',
-          revenue: 1,
-          transactions: 1
-        }
-      },
-      { $sort: { revenue: -1 } }
-    ]);
-
-    // Renewal Breakdown (New vs Auto-Renewals vs Repeats)
-    const histDateFilter = {};
-    if (req.query.startDate || req.query.endDate) {
       histDateFilter.event_date = {};
-      if (req.query.startDate) histDateFilter.event_date.$gte = new Date(req.query.startDate);
+      if (req.query.startDate) {
+        startD = new Date(req.query.startDate);
+        iapDateFilter.purchase_date.$gte = startD;
+        histDateFilter.event_date.$gte = startD;
+      }
       if (req.query.endDate) {
-        const end = new Date(req.query.endDate);
-        end.setHours(23, 59, 59, 999);
-        histDateFilter.event_date.$lte = end;
+        endD = new Date(req.query.endDate);
+        endD.setHours(23, 59, 59, 999);
+        iapDateFilter.purchase_date.$lte = endD;
+        histDateFilter.event_date.$lte = endD;
       }
     } else {
       const days = parseInt(req.query.days) || 30;
-      const sDate = new Date();
-      sDate.setDate(sDate.getDate() - days);
-      sDate.setHours(0, 0, 0, 0);
-      histDateFilter.event_date = { $gte: sDate };
+      startD = new Date();
+      startD.setDate(startD.getDate() - (days - 1));
+      startD.setHours(0, 0, 0, 0);
+      iapDateFilter.purchase_date = { $gte: startD };
+      histDateFilter.event_date = { $gte: startD };
     }
 
-    const renewalStats = await SubscriptionHistory.aggregate([
-      {
-        $match: {
-          ...(filters.app_id ? { app_id: filters.app_id } : {}),
-          ...histDateFilter
+    const [rawRevenueTrends, appBreakdown, renewalStats] = await Promise.all([
+      InAppPurchase.aggregate([
+        {
+          $match: {
+            ...filters,
+            ...iapDateFilter
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$purchase_date' }
+            },
+            total_revenue: { $sum: '$amount' },
+            subscription_revenue: {
+              $sum: { $cond: [{ $eq: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
+            },
+            consumable_revenue: {
+              $sum: { $cond: [{ $ne: ['$plan_type', 'SUBSCRIPTION'] }, '$amount', 0] }
+            },
+            purchase_count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      InAppPurchase.aggregate([
+        {
+          $match: {
+            ...filters,
+            ...iapDateFilter
+          }
+        },
+        {
+          $group: {
+            _id: '$app_id',
+            revenue: { $sum: '$amount' },
+            transactions: { $sum: 1 }
+          }
+        },
+        {
+          $lookup: {
+            from: 'tbl_app',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'app'
+          }
+        },
+        { $unwind: '$app' },
+        {
+          $project: {
+            app_id: '$_id',
+            app_name: '$app.app_name',
+            package_name: '$app.package_name',
+            revenue: 1,
+            transactions: 1
+          }
+        },
+        { $sort: { revenue: -1 } }
+      ]),
+      SubscriptionHistory.aggregate([
+        {
+          $match: {
+            ...(filters.app_id ? { app_id: filters.app_id } : {}),
+            ...histDateFilter
+          }
+        },
+        {
+          $group: {
+            _id: '$event_type',
+            count: { $sum: 1 },
+            amount: { $sum: '$amount' }
+          }
         }
-      },
-      {
-        $group: {
-          _id: '$event_type',
-          count: { $sum: 1 },
-          amount: { $sum: '$amount' }
-        }
-      }
+      ])
     ]);
+
+    // Build complete daily timeline ensuring all dates have exact accurate values
+    const revenueMap = {};
+    rawRevenueTrends.forEach((item) => {
+      revenueMap[item._id] = item;
+    });
+
+    const revenueTrends = [];
+    const curr = new Date(startD);
+    const stop = new Date(endD);
+    curr.setHours(0, 0, 0, 0);
+    stop.setHours(23, 59, 59, 999);
+
+    while (curr <= stop) {
+      const dateStr = curr.toISOString().split('T')[0];
+      if (revenueMap[dateStr]) {
+        revenueTrends.push(revenueMap[dateStr]);
+      } else {
+        revenueTrends.push({
+          _id: dateStr,
+          total_revenue: 0,
+          subscription_revenue: 0,
+          consumable_revenue: 0,
+          purchase_count: 0
+        });
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
 
     res.json({
       success: true,
