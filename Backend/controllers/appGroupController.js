@@ -349,7 +349,16 @@ const deleteApp = async (req, res) => {
 const getAccountsByApp = async (req, res) => {
   try {
     const { appId } = req.params;
-    const accounts = await Account.find({ app_id: appId }).sort({ create_date: -1 });
+    const accounts = await Account.find({ app_id: appId }).sort({ createdAt: -1 });
+    res.json({ success: true, accounts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getAllAccounts = async (req, res) => {
+  try {
+    const accounts = await Account.find().sort({ createdAt: -1 });
     res.json({ success: true, accounts });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -359,19 +368,19 @@ const getAccountsByApp = async (req, res) => {
 const createAccount = async (req, res) => {
   try {
     const { app_id, account_name, store_type, developer_email, account_id, credentials_json } = req.body;
-    if (!app_id || !account_name || !store_type) {
+    if (!account_name || !store_type) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide app_id, account_name, and store_type'
+        message: 'Please provide account_name and store_type'
       });
     }
 
     const account = await Account.create({
-      app_id,
-      account_name,
+      app_id: app_id && mongoose.Types.ObjectId.isValid(app_id) ? app_id : null,
+      account_name: account_name.trim(),
       store_type,
-      developer_email: developer_email || '',
-      account_id: account_id || '',
+      developer_email: developer_email?.trim() || '',
+      account_id: account_id?.trim() || '',
       credentials_json: credentials_json || {}
     });
 
@@ -401,6 +410,7 @@ module.exports = {
   updateApp,
   regenerateApiKeys,
   deleteApp,
+  getAllAccounts,
   getAccountsByApp,
   createAccount,
   deleteAccount

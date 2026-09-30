@@ -8,7 +8,10 @@ const ownNotificationSchema = new mongoose.Schema(
     fcm_token: { type: String, trim: true },
     user_timezone: { type: String, default: 'UTC' },
     target_local_time: { type: String, default: '20:00' },
+    user_date_time: { type: String, default: '' }, // as per user device local time
     dispatched_at: { type: Date },
+    notification_send_date_time: { type: Date },
+    user_click_notification: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ['QUEUED', 'SENT', 'FAILED'],

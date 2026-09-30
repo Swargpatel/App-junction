@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const accountSchema = new mongoose.Schema(
   {
-    app_id: { type: mongoose.Schema.Types.ObjectId, ref: 'App', required: true },
+    app_id: { type: mongoose.Schema.Types.ObjectId, ref: 'App', default: null },
     account_name: { type: String, required: true, trim: true },
     store_type: {
       type: String,

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const crossNotificationSchema = new mongoose.Schema(
   {
+    // Campaign Definition
     title: { type: String, required: true, trim: true },
     source_app_id: { type: mongoose.Schema.Types.ObjectId, ref: 'App' }, // Which app displays the ad
     target_group_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' }, // Display across all apps in group
@@ -10,6 +11,8 @@ const crossNotificationSchema = new mongoose.Schema(
     custom_message: { type: String, default: '' },
     target_button_text: { type: String, default: 'Install Now' },
     destination_store_url: { type: String, default: '' },
+
+    // Metrics & Lifecycle
     impressions_count: { type: Number, default: 0 },
     clicks_count: { type: Number, default: 0 },
     status: {

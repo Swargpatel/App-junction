@@ -31,7 +31,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ theme, toggleTheme, onLogout 
     countries: [],
     os: []
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const location = useLocation();
 
@@ -53,10 +53,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ theme, toggleTheme, onLogout 
         api.get('/admin/groups')
       ]);
 
-      if (appsRes.data.success) setApps(appsRes.data.apps);
-      if (groupsRes.data.success) setGroups(groupsRes.data.groups);
+      if (appsRes.data.success) setApps(appsRes.data.apps || []);
+      if (groupsRes.data.success) setGroups(groupsRes.data.groups || []);
 
-      await fetchAnalytics();
+      fetchAnalytics();
     } catch (err: any) {
       console.error('Failed to load initial data:', err);
       if (err.response?.status === 401) {
@@ -127,11 +127,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ theme, toggleTheme, onLogout 
             />
             <Route
               path="/apps"
-              element={<AppsView apps={apps} groups={groups} onRefresh={loadBaseData} />}
+              element={<AppsView apps={apps} groups={groups} onRefresh={loadBaseData} isLoading={isLoading} />}
             />
             <Route
               path="/groups"
-              element={<GroupsView groups={groups} apps={apps} onRefresh={loadBaseData} />}
+              element={<GroupsView groups={groups} apps={apps} onRefresh={loadBaseData} isLoading={isLoading} />}
             />
             <Route
               path="/revenue"

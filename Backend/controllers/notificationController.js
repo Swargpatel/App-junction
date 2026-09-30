@@ -15,6 +15,7 @@ const createNotification = async (req, res) => {
       target_country,
       target_local_time, // e.g. "20:00" for 8:00 PM
       action_url,
+      page_need_to_redirect,
       notification_type
     } = req.body;
 
@@ -29,13 +30,19 @@ const createNotification = async (req, res) => {
       image_url = req.body.image_url;
     }
 
+    const redirectTarget = page_need_to_redirect || action_url || req.body.URL || '';
+
     const campaign = await Notification.create({
       app_id: app_id || null,
       group_id: group_id || null,
       title,
       message,
+      Notification_message_text: message,
       image_url,
-      action_url: action_url || '',
+      Notification_message_image_url: image_url,
+      action_url: redirectTarget,
+      URL: redirectTarget,
+      page_need_to_redirect: redirectTarget,
       notification_type: notification_type || 'SELF',
       target_audience: target_audience || 'ALL',
       target_country: target_country || 'ALL',

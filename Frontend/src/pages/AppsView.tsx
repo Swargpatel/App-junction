@@ -32,9 +32,10 @@ interface AppsViewProps {
   apps: App[];
   groups: Group[];
   onRefresh: () => void;
+  isLoading?: boolean;
 }
 
-export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) => {
+export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh, isLoading = false }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingAppId, setEditingAppId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'stores' | 'marketing' | 'policy'>('basic');
@@ -679,7 +680,18 @@ export const AppsView: React.FC<AppsViewProps> = ({ apps, groups, onRefresh }) =
             </tr>
           </thead>
           <tbody>
-            {apps.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '60px 20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px' }}>
+                    <div className="spinner" style={{ width: '34px', height: '34px' }} />
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      Loading applications...
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            ) : apps.length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
                   <Smartphone size={36} style={{ margin: '0 auto 10px', opacity: 0.35 }} />

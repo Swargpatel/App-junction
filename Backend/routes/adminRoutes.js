@@ -16,6 +16,7 @@ const {
   updateApp,
   regenerateApiKeys,
   deleteApp,
+  getAllAccounts,
   getAccountsByApp,
   createAccount,
   deleteAccount
@@ -73,6 +74,7 @@ router.post('/apps/:id/keys', protectAdmin, regenerateApiKeys);
 router.delete('/apps/:id', protectAdmin, deleteApp);
 
 // ==================== ACCOUNTS ====================
+router.get('/accounts', protectAdmin, getAllAccounts);
 router.get('/accounts/app/:appId', protectAdmin, getAccountsByApp);
 router.post('/accounts', protectAdmin, createAccount);
 router.delete('/accounts/:id', protectAdmin, deleteAccount);

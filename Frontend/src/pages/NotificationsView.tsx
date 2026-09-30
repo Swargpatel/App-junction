@@ -34,6 +34,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ apps, grou
   // Form states
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
+  const [redirectPage, setRedirectPage] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [targetTime, setTargetTime] = useState('20:00'); // 8:00 PM local time default
   const [selectedApp, setSelectedApp] = useState('');
   const [targetCountry, setTargetCountry] = useState('ALL');
@@ -64,6 +66,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ apps, grou
         app_id: selectedApp || null,
         title,
         message,
+        image_url: imageUrl.trim(),
+        page_need_to_redirect: redirectPage.trim(),
+        action_url: redirectPage.trim(),
         target_local_time: targetTime,
         target_country: targetCountry,
         target_audience: targetAudience
@@ -73,6 +78,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ apps, grou
         setShowModal(false);
         setTitle('');
         setMessage('');
+        setRedirectPage('');
+        setImageUrl('');
         fetchCampaigns();
         alert(res.data.message || 'Notification campaign scheduled successfully!');
       }
@@ -437,6 +444,13 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ apps, grou
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>
                           {camp.message}
                         </div>
+                        {camp.page_need_to_redirect && (
+                          <div style={{ marginTop: '5px' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#818CF8', background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)', padding: '2px 7px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                              🔗 Redirect: {camp.page_need_to_redirect}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -583,6 +597,33 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ apps, grou
                     onChange={(e) => setMessage(e.target.value)}
                     required
                   />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                      Redirect Page / Route (page_need_to_redirect)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HOME, STORE, PREMIUM_SCREEN, https://..."
+                      className="input-control font-mono"
+                      value={redirectPage}
+                      onChange={(e) => setRedirectPage(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                      Notification Image URL (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/banner.png"
+                      className="input-control font-mono"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

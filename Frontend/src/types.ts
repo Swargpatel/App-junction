@@ -165,6 +165,9 @@ export interface NotificationCampaign {
   title: string;
   message: string;
   image_url?: string;
+  action_url?: string;
+  page_need_to_redirect?: string;
+  Notification_message_text?: string;
   notification_type: 'SELF' | 'CROSS';
   target_audience: string;
   target_country: string;

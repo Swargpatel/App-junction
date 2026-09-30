@@ -19,9 +19,10 @@ interface GroupsViewProps {
   groups: Group[];
   apps?: AppType[];
   onRefresh: () => void;
+  isLoading?: boolean;
 }
 
-export const GroupsView: React.FC<GroupsViewProps> = ({ groups, apps = [], onRefresh }) => {
+export const GroupsView: React.FC<GroupsViewProps> = ({ groups, apps = [], onRefresh, isLoading = false }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [groupName, setGroupName] = useState('');
@@ -157,17 +158,33 @@ export const GroupsView: React.FC<GroupsViewProps> = ({ groups, apps = [], onRef
       </div>
 
       {/* Groups Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
-        {groups.map((group) => {
-          // Find apps assigned to this group
-          const assignedApps = apps.filter((a) => {
-            const gId = typeof a.group_id === 'object' && a.group_id ? (a.group_id as any)._id : a.group_id;
-            return gId === group._id;
-          });
+      {isLoading ? (
+        <div className="glass-panel" style={{ padding: '60px 20px', textAlign: 'center', gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '14px' }}>
+            <div className="spinner" style={{ width: '34px', height: '34px' }} />
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              Loading application groups...
+            </span>
+          </div>
+        </div>
+      ) : groups.length === 0 ? (
+        <div className="glass-panel" style={{ padding: '60px 20px', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-dim)' }}>
+          <FolderKanban size={38} style={{ margin: '0 auto 12px', opacity: 0.35 }} />
+          <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-muted)' }}>No application groups created yet.</div>
+          <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>Click "Create New Group" above to organize your applications.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+          {groups.map((group) => {
+            // Find apps assigned to this group
+            const assignedApps = apps.filter((a) => {
+              const gId = typeof a.group_id === 'object' && a.group_id ? (a.group_id as any)._id : a.group_id;
+              return gId === group._id;
+            });
 
-          return (
-            <div
-              key={group._id}
+            return (
+              <div
+                key={group._id}
               className="glass-panel"
               style={{
                 padding: '24px',
@@ -318,6 +335,7 @@ export const GroupsView: React.FC<GroupsViewProps> = ({ groups, apps = [], onRef
           );
         })}
       </div>
+      )}
 
       {/* Create / Edit Group Modal with Multiple App Selection */}
       {showModal && (

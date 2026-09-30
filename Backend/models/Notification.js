@@ -6,13 +6,19 @@ const notificationSchema = new mongoose.Schema(
     group_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },
     title: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
+    Notification_message_text: { type: String, trim: true, default: '' },
     image_url: { type: String, default: '' },
+    Notification_message_image_url: { type: String, default: '' },
     action_url: { type: String, default: '' },
+    URL: { type: String, default: '' },
+    page_need_to_redirect: { type: String, default: '' },
+    is_own_notification: { type: Boolean, default: true },
     notification_type: {
       type: String,
       enum: ['SELF', 'CROSS'],
       default: 'SELF'
     },
+    Notification_type: { type: String, default: 'text' }, // only text / image / URL
     target_audience: {
       type: String,
       enum: ['ALL', 'ACTIVE_LAST_7_DAYS', 'INACTIVE_30_DAYS', 'COUNTRY_SPECIFIC'],
